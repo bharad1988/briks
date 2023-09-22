@@ -31,7 +31,7 @@
   CLITERAL(Color) { x, g2(x), b2(x), 255 } // Beige
 
 #define gencolorgold(x)                                                        \
-  CLITERAL(Color) { x, x - 50, 50, 255 } // Gold
+  CLITERAL(Color) { x, x - 50, 10, 255 } // Gold
 #define gencolor(x)                                                            \
   CLITERAL(Color) { x, g(x), b(x), 255 } // Beige
 
@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
   bool pause = false;
   // Main game loop
   InitWall();
-
+  int golden_frame_counter = 0;
   while (!WindowShouldClose()) // Detect window close button or ESC key
   {
     // update the music stream buffer // this moves it ahead
@@ -118,10 +118,16 @@ int main(int argc, char *argv[]) {
       grid_depth++;
     }
     DrawObject(startPos_x + move, startPos_y + grid_depth, orientation);
+    if (goldenwall > 0) {
+      if (golden_frame_counter < 3 * MyFPS)
+        golden_frame_counter++;
+      else {
+        golden_frame_counter = 0;
+        ResetWallLine();
+      }
+    }
     DrawWall();
     DrawGoldenWall();
-    if (goldenwall > 0) ResetWallLine();
-
     // DrawFPS(10, 10);
     EndDrawing();
   }
@@ -169,8 +175,11 @@ void DrawWall() {
       }
     }
     if (brickCounter == wallW) {
-      wallLine[i] = true;
-      goldenwall++;
+      if (!wallLine[i]) {
+        wallLine[i] = true;
+        goldenwall++;
+        printf("goldenwall - %d", goldenwall);
+      }
     }
   }
 }
@@ -189,7 +198,16 @@ void DrawGoldenWall() {
 
 void ResetWallLine() {
   int i = wallH - 1;
+  bool found = false;
   while (i > 0) {
+    if (!found) {
+      if (wallLine[i] == true)
+        found = true;
+      else {
+        i--;
+        continue;
+      }
+    }
     for (int j = 0; j < wallW; j++) {
       wallMap[i][j] = wallMap[i - 1][j];
     }
@@ -197,6 +215,7 @@ void ResetWallLine() {
     i--;
   }
   goldenwall--;
+  printf("goldenwall - %d", goldenwall);
 }
 
 bool checkWall(int x, int y) {
@@ -241,7 +260,7 @@ void DrawWallMiniBox(int x, int y, int color) {
   }
   if (color == MYGOLD) {
     color1 = gencolorgold(245);
-    color2 = gencolorgold(235);
+    color2 = gencolorgold(255);
   }
   DrawRectangleRec(rec, color1);
   Rectangle rec2 = {xp + depth, yp + depth, box - depth * 2, box - depth * 2};
