@@ -1,0 +1,3 @@
+-I/home/ajay/code/libs/raylib/src/
+-lraylib
+-L/home/ajay/code/libs/raylib/src/
