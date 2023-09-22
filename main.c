@@ -71,6 +71,7 @@ bool make_object_brick = false;
 
 bool reset_object = false;
 int goldenwall = 0;
+int score = 0;
 
 int main(int argc, char *argv[]) {
 
@@ -101,6 +102,9 @@ int main(int argc, char *argv[]) {
     BeginDrawing();
     ClearBackground(RAYWHITE);
     DrawMyGrid();
+    char buffer[50];
+    sprintf(buffer , "Score - %d", score);
+    DrawText(buffer, 10, 10, 20, DARKGRAY);
     frame_counter++;
     if (frame_counter > fallspeed(MyFPS)) {
       frame_counter = 0;
@@ -178,7 +182,7 @@ void DrawWall() {
       if (!wallLine[i]) {
         wallLine[i] = true;
         goldenwall++;
-        printf("goldenwall - %d", goldenwall);
+        score++;
       }
     }
   }
