@@ -5,15 +5,15 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <threads.h>
 
 #define g(x) x - 10
 #define b(x) x - 20
-
 #define g2(x) x + 5
 #define b2(x) x + 10
-
 #define g3(x) x - 50
 
 #define MyFPS 60
@@ -24,44 +24,31 @@
 #define wallW 20 // wf * multiple / box
 
 // colors
+#define MYBEIGE 0
 #define MYGRAY 1
 #define MYGOLD 2
 
 #define gencolorgrey(x)                                                        \
-  CLITERAL(Color) { x, g2(x), b2(x), 255 } // Beige
-
+  CLITERAL(Color) { x, g2(x), b2(x), 255 } // Grey
 #define gencolorgold(x)                                                        \
-  CLITERAL(Color) { x, x - 50, 10, 255 } // Gold
+  CLITERAL(Color) { x, x - 40, 0, 255 } // Gold
 #define gencolor(x)                                                            \
   CLITERAL(Color) { x, g(x), b(x), 255 } // Beige
 
 #define BEIGE2                                                                 \
   CLITERAL(Color) { 230, 220, 210, 255 } // Beige
 
-// function declarations
-void InitWall();
-void DrawMyGrid();
-void DrawWall();
-void DrawGoldenWall();
-void ResetWallLine();
-void DrawMiniBox(int x, int y);
-void DrawWallMiniBox(int x, int y, int color);
-void DrawObject(int x, int y, int direction);
-void TBoxU(int startX, int StartY);
-void TBoxD(int startX, int StartY);
-void TBoxR(int startX, int StartY);
-void TBoxL(int startX, int StartY);
-
 const int hf = 12; // height ratio
 const int wf = 10; // width ratio
 
 bool wallMap[wallH + 1][wallW];
 bool wallLine[wallH];
-
+int goldenwall = 0;
+int score = 0;
 // inital position of object
 // --- all these have to be reset  ON BRICK -----
-size_t startPos_x = wallW / 2;
-size_t startPos_y = 0;
+float startPos_x = wallW / 2.0;
+float startPos_y = 0;
 size_t grid_depth = 0; // falling position
 int orientation = 0;   // object orientation
 int move = 0;          // lateral movement , relative from starting pos
@@ -70,12 +57,255 @@ bool make_object_brick = false;
 // ------------------------------------
 
 bool reset_object = false;
-int goldenwall = 0;
-int score = 0;
+
+// function declarations
+void InitWall();
+void DrawMyGrid();
+void DrawWall();
+void DrawGoldenWall(int color);
+void ResetWallLine();
+void resetObject();
+void DrawMiniBox(int x, int y);
+void DrawWallMiniBox(int x, int y, int color);
+void DrawObject(int x, int y, int direction);
+void TBoxU(int startX, int StartY);
+void TBoxD(int startX, int StartY);
+void TBoxR(int startX, int StartY);
+void TBoxL(int startX, int StartY);
+
+typedef struct TShape {
+  float x;
+  float y;
+  Vector2 a; //-
+  Vector2 b; // -
+  Vector2 c; //  -
+  Vector2 d; // |
+  int orientation;
+  int new_orientation;
+  bool brick;
+  bool invalid_orientation;
+} tshape_t;
+
+typedef struct LineShape3 {
+  int a; //-
+  int b; // -
+  int c; //  -
+  int orientation;
+  int new_orientation;
+  bool brick;
+} lineshape3_t;
+
+typedef struct LineShape2 {
+  int a; //-
+  int b; // -
+  int orientation;
+  bool brick;
+} lineshape2_t;
+
+void setBrick(int x, int y) { wallMap[y][x] = true; }
+
+void RenderMiniBox(int x, int y, int color) {
+  size_t depth = 3;
+  size_t xp = x * box;
+  size_t yp = y * box;
+  Color color1, color2;
+  switch (color) {
+  case MYGRAY:
+    color1 = gencolorgrey(200);
+    color2 = gencolorgrey(180);
+    break;
+  case MYGOLD:
+    color1 = gencolorgold(245);
+    color2 = gencolorgold(255);
+    break;
+  case MYBEIGE:
+    color1 = gencolor(220);
+    color2 = gencolor(200);
+    break;
+  default:
+    color1 = gencolorgold(color);
+    color2 = gencolorgold(color + 10);
+  }
+
+  Rectangle rec = {xp, yp, box, box};
+  DrawRectangleRec(rec, color1);
+  Rectangle rec2 = {xp + depth, yp + depth, box - depth * 2, box - depth * 2};
+  DrawRectangleRec(rec2, color2);
+}
+
+bool check_t_brick(tshape_t t) {
+  if (wallMap[(int)t.a.y + 1][(int)t.a.x] == true) {
+    // printf("BRICCKED1 ");
+    return true;
+  }
+  if (wallMap[(int)t.b.y + 1][(int)t.b.x] == true) {
+    // printf("BRICCKED2 ");
+    return true;
+  }
+  if (wallMap[(int)t.c.y + 1][(int)t.c.x] == true) {
+    // printf("BRICCKED3 ");
+    return true;
+  }
+  if (wallMap[(int)t.d.y + 1][(int)t.d.x] == true) {
+    // printf("BRICCKED4 ");
+    return true;
+  }
+  return false;
+}
+
+void set_t_brick(tshape_t *t) {
+  setBrick(t->a.x, t->a.y);
+  setBrick(t->b.x, t->b.y);
+  setBrick(t->c.x, t->c.y);
+  setBrick(t->d.x, t->d.y);
+}
+
+bool is_brick_wall(Vector2 v1) {
+  if (wallMap[(int)v1.x][(int)v1.y] == true)
+    return true;
+  return false;
+}
+
+tshape_t design_tshape(tshape_t *t) {
+  tshape_t t2;
+  if (t->new_orientation == 0) {
+    // draw up
+    t2.a.x = t->x - 1;
+    t2.a.y = t->y + 1;
+    if (is_brick_wall(t2.a)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.b.x = t->x;
+    t2.b.y = t->y + 1;
+    if (is_brick_wall(t2.b)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.c.x = t->x + 1;
+    t2.c.y = t->y + 1;
+    if (is_brick_wall(t2.c)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.d.x = t->x;
+    t2.d.y = t->y;
+    if (is_brick_wall(t2.d)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.brick = check_t_brick(t2);
+  } else if (t->new_orientation == 1) {
+    // draw right
+    t2.a.x = t->x;
+    t2.a.y = t->y;
+    if (is_brick_wall(t2.a)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.b.x = t->x;
+    t2.b.y = t->y + 1;
+    if (is_brick_wall(t2.b)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.c.x = t->x;
+    t2.c.y = t->y + 2;
+    if (is_brick_wall(t2.c)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.d.x = t->x + 1;
+    t2.d.y = t->y + 1;
+    if (is_brick_wall(t2.d)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.brick = check_t_brick(t2);
+  } else if (t->new_orientation == 2) {
+    // draw down
+    t2.a.x = t->x - 1;
+    t2.a.y = t->y;
+    if (is_brick_wall(t2.a)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.b.x = t->x;
+    t2.b.y = t->y;
+    if (is_brick_wall(t2.b)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.c.x = t->x + 1;
+    t2.c.y = t->y;
+    if (is_brick_wall(t2.c)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.d.x = t->x;
+    t2.d.y = t->y + 1;
+    if (is_brick_wall(t2.d)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.brick = check_t_brick(t2);
+  } else if (t->new_orientation == 3) {
+    // draw left
+    t2.a.x = t->x;
+    t2.a.y = t->y;
+    if (is_brick_wall(t2.a)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.b.x = t->x;
+    t2.b.y = t->y + 1;
+    if (is_brick_wall(t2.b)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.c.x = t->x;
+    t2.c.y = t->y + 2;
+    if (is_brick_wall(t2.c)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.d.x = t->x - 1;
+    t2.d.y = t->y + 1;
+    if (is_brick_wall(t2.d)) {
+      t2.invalid_orientation = true;
+      return t2;
+    }
+    t2.brick = check_t_brick(t2);
+  }
+  return t2;
+}
+
+void render_all_t_box(tshape_t *t1, int color) {
+  RenderMiniBox(t1->a.x, t1->a.y, color);
+  RenderMiniBox(t1->b.x, t1->b.y, color);
+  RenderMiniBox(t1->c.x, t1->c.y, color);
+  RenderMiniBox(t1->d.x, t1->d.y, color);
+}
+
+void draw_t_shape(tshape_t *t1) {
+  tshape_t t2 = design_tshape(t1);
+  if (t2.invalid_orientation) {
+    t1->new_orientation = t1->orientation;
+    t2 = design_tshape(t1);
+  }
+  t1 = &t2;
+  // printf("brick status %d , t2 %d\n", t1->brick, t2.brick);
+  if (t2.brick == true) {
+    // printf("t2 setting bricks \n");
+    set_t_brick(t1);
+    resetObject();
+    return;
+  }
+  render_all_t_box(t1, MYBEIGE);
+}
 
 int main(int argc, char *argv[]) {
-
-  InitWindow(multiple * wf, multiple * hf, "Hello World");
+  InitWindow(multiple * wf, multiple * (hf), "BRIKS");
   InitAudioDevice();
   Music music = LoadMusicStream("resources/t-2.mp3");
   // Music music = LoadMusicStream("resources/country.mp3");
@@ -95,6 +325,11 @@ int main(int argc, char *argv[]) {
   // Main game loop
   InitWall();
   int golden_frame_counter = 0;
+  // tshape_t *t1 = (tshape_t *)malloc(sizeof(tshape_t));
+  tshape_t t1;
+  t1.brick = false;
+  printf("default brick status - %d ", t1.brick);
+  // Main event loop for UI - check FPS for frequency
   while (!WindowShouldClose()) // Detect window close button or ESC key
   {
     // update the music stream buffer // this moves it ahead
@@ -103,7 +338,7 @@ int main(int argc, char *argv[]) {
     ClearBackground(RAYWHITE);
     DrawMyGrid();
     char buffer[50];
-    sprintf(buffer , "Score - %d", score);
+    sprintf(buffer, "Score - %d", score);
     DrawText(buffer, 10, 10, 20, DARKGRAY);
     frame_counter++;
     if (frame_counter > fallspeed(MyFPS)) {
@@ -121,17 +356,31 @@ int main(int argc, char *argv[]) {
     if (IsKeyPressed(KEY_DOWN)) {
       grid_depth++;
     }
-    DrawObject(startPos_x + move, startPos_y + grid_depth, orientation);
+    t1.orientation = orientation;
+    t1.x = startPos_x + (float)move;
+    t1.y = startPos_y + (float)grid_depth;
+    // printf("Draw t1 x, y %f, %f \n", t1.x, t1.y);
+    // FIXME : if not for this , it is segfaulting !!! something to do with threads and asyc ??
+    printf("i "); 
+    draw_t_shape(&t1);
+
+    DrawWall();
     if (goldenwall > 0) {
-      if (golden_frame_counter < 3 * MyFPS)
+      if (golden_frame_counter < MyFPS) {
         golden_frame_counter++;
-      else {
+        DrawGoldenWall(golden_frame_counter + 10);
+      } else {
         golden_frame_counter = 0;
         ResetWallLine();
       }
     }
-    DrawWall();
-    DrawGoldenWall();
+    /*     for (int i = 0; i <= wallH; i++) {
+          for (int j = 0; j < wallW; j++) {
+            printf("%d ", wallMap[i][j]);
+          }
+          printf("\n");
+        }
+     */
     // DrawFPS(10, 10);
     EndDrawing();
   }
@@ -149,18 +398,13 @@ int main(int argc, char *argv[]) {
 }
 
 void InitWall() {
-  for (int i = 0; i <= wallH; i++) {
-    for (int j = 0; j < wallW; j++) {
-      if (i == wallH) {
-        wallMap[i][j] = true;
-      } else
-        wallMap[i][j] = false;
-    }
+  for (int j = 0; j < wallW; j++) {
+    wallMap[wallH][j] = true;
   }
 }
 
 void resetObject() {
-  startPos_x = wallW / 2;
+  startPos_x = wallW / 2.0;
   startPos_y = 0;
   grid_depth = 0;  // falling position
   orientation = 0; // object orientation
@@ -170,11 +414,12 @@ void resetObject() {
 }
 
 void DrawWall() {
-  for (int i = 0; i < wallH; i++) {
+  for (int i = 0; i <= wallH; i++) {
     int brickCounter = 0;
     for (int j = 0; j < wallW; j++) {
       if (wallMap[i][j] == true) {
-        DrawWallMiniBox(j, i, MYGRAY);
+        // printf("render box wall height, x- %d ,y- %d \n", j, i);
+        RenderMiniBox(j, i, MYGRAY);
         brickCounter++;
       }
     }
@@ -188,12 +433,12 @@ void DrawWall() {
   }
 }
 
-void DrawGoldenWall() {
+void DrawGoldenWall(int color) {
   for (int i = 0; i < wallH; i++) {
     if (wallLine[i] == true) {
       for (int j = 0; j < wallW; j++) {
         if (wallMap[i][j] == true) {
-          DrawWallMiniBox(j, i, MYGOLD);
+          RenderMiniBox(j, i, 255 - color);
         }
       }
     }
@@ -219,7 +464,7 @@ void ResetWallLine() {
     i--;
   }
   goldenwall--;
-  printf("goldenwall - %d", goldenwall);
+  // printf("goldenwall - %d \n", goldenwall);
 }
 
 bool checkWall(int x, int y) {
@@ -230,7 +475,6 @@ bool checkWall(int x, int y) {
   return false;
 }
 
-void setBrick(int x, int y) { wallMap[y][x] = true; }
 void DrawMyGrid() {
   for (int x = box; x < multiple * wf; x += box)
     DrawLine(x, 0, x, multiple * hf, BEIGE2);
@@ -238,7 +482,7 @@ void DrawMyGrid() {
     DrawLine(0, y, multiple * wf, y, BEIGE2);
 }
 
-void DrawMiniBox(int x, int y) {
+/* void DrawMiniBox(int x, int y) {
   size_t depth = 3;
   size_t xp = x * box;
   size_t yp = y * box;
@@ -251,7 +495,7 @@ void DrawMiniBox(int x, int y) {
     reset_object = true;
   }
 }
-
+ */
 void DrawWallMiniBox(int x, int y, int color) {
   size_t depth = 3;
   size_t xp = x * box;
@@ -269,54 +513,4 @@ void DrawWallMiniBox(int x, int y, int color) {
   DrawRectangleRec(rec, color1);
   Rectangle rec2 = {xp + depth, yp + depth, box - depth * 2, box - depth * 2};
   DrawRectangleRec(rec2, color2);
-}
-
-void DrawObject(int x, int y, int direction) {
-  if (direction == 0) {
-    // draw up
-    TBoxU(x, y);
-  } else if (direction == 1) {
-    // draw down
-    TBoxD(x, y);
-  } else if (direction == 2) {
-    // draw down
-    TBoxR(x, y);
-  } else if (direction == 3) {
-    // draw down
-    TBoxL(x, y);
-  }
-  // if object bricked, reset the object
-  if (reset_object == true) {
-    // check if line is any complete
-    resetObject();
-    reset_object = false;
-  }
-}
-
-void TBoxD(int startX, int startY) {
-  DrawMiniBox(startX + 1, startY + 2);
-  for (int i = startX; i < startX + 3; i++) {
-    DrawMiniBox(i, startY + 1);
-  }
-}
-
-void TBoxU(int startX, int startY) {
-  for (int i = startX; i < startX + 3; i++) {
-    DrawMiniBox(i, startY + 1);
-  }
-  DrawMiniBox(startX + 1, startY);
-}
-
-void TBoxR(int startX, int startY) {
-  for (int i = startY + 3; i > startY; i--) {
-    DrawMiniBox(startX + 1, i);
-  }
-  DrawMiniBox(startX + 2, startY + 2);
-}
-
-void TBoxL(int startX, int startY) {
-  for (int i = startY + 3; i > startY; i--) {
-    DrawMiniBox(startX + 1, i);
-  }
-  DrawMiniBox(startX, startY + 2);
 }
