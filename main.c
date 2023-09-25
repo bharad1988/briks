@@ -374,7 +374,7 @@ void draw_line_shape(lineshape_t *l) {
 }
 
 int main(int argc, char *argv[]) {
-  InitWindow(multiple * (wf + 10) , multiple * (hf), "BRIKS");
+  InitWindow(multiple * (wf + 10), multiple * (hf), "BRIKS");
   InitAudioDevice();
   Music music = LoadMusicStream("resources/t-2.mp3");
   // Music music = LoadMusicStream("resources/country.mp3");
@@ -396,7 +396,7 @@ int main(int argc, char *argv[]) {
   int golden_frame_counter = 0;
   // tshape_t *t1 = (tshape_t *)malloc(sizeof(tshape_t));
   tshape_t t1;
-  lineshape_t l1,l2,l3;
+  lineshape_t l1, l2, l3;
   t1.brick = false;
   int pick_shape = LINESHAPE;
   printf("default brick status - %d ", t1.brick);
@@ -409,48 +409,61 @@ int main(int argc, char *argv[]) {
     ClearBackground(RAYWHITE);
     DrawMyGrid();
     char buffer[50];
-    sprintf(buffer, "Score - %d", score-1);
+    sprintf(buffer, "Score - %d", score - 1);
     DrawText(buffer, (wf * multiple) + 10, 10, 20, DARKGRAY);
-    frame_counter++;
-    if (frame_counter > fallspeed(MyFPS)) {
-      frame_counter = 0;
-      grid_depth += 1;
-    }
-    if (IsKeyPressed(KEY_S))
-      orientation = (orientation + 1) % 4;
-    if (IsKeyPressed(KEY_RIGHT)) {
-      move += 1;
-    }
-    if (IsKeyPressed(KEY_LEFT)) {
-      move -= 1;
-    }
-    if (IsKeyPressed(KEY_DOWN)) {
-      grid_depth++;
-    }
-    // when reset pick a type of object
-    if (reset_object) {
-    srand(time(0));
-    object_picker = rand();
-    printf("rand number %d \n", object_picker);
-      if (object_picker % 4 == TSHAPE) {
-        pick_shape = TSHAPE;
-      } else if (object_picker % 4 == LINESHAPE) {
-        pick_shape = LINESHAPE;
-      } else if (object_picker % 4 == LINESHAPE2) {
-        pick_shape = LINESHAPE2;
-      } else if (object_picker % 4 == LINESHAPE3) {
-        pick_shape = LINESHAPE3;
-      }
-      reset_object = false;
-    }
 
+    // Pause/Resume music playing with key p
+    if (IsKeyPressed(KEY_P)) {
+      pause = !pause;
+      if (pause) {
+        PauseMusicStream(music);
+      } else
+        ResumeMusicStream(music);
+    }
+    if (!pause) {
+      frame_counter++;
+      if (frame_counter > fallspeed(MyFPS)) {
+        frame_counter = 0;
+        grid_depth += 1;
+      }
+      if (IsKeyPressed(KEY_S))
+        orientation = (orientation + 1) % 4;
+      if (IsKeyPressed(KEY_RIGHT)) {
+        move += 1;
+      }
+      if (IsKeyPressed(KEY_LEFT)) {
+        move -= 1;
+      }
+      if (IsKeyPressed(KEY_DOWN)) {
+        grid_depth++;
+      }
+      // when reset pick a type of object
+      if (reset_object) {
+        srand(time(0));
+        object_picker = rand();
+        printf("rand number %d \n", object_picker);
+        if (object_picker % 4 == TSHAPE) {
+          pick_shape = TSHAPE;
+        } else if (object_picker % 4 == LINESHAPE) {
+          pick_shape = LINESHAPE;
+        } else if (object_picker % 4 == LINESHAPE2) {
+          pick_shape = LINESHAPE2;
+        } else if (object_picker % 4 == LINESHAPE3) {
+          pick_shape = LINESHAPE3;
+        }
+        reset_object = false;
+      }
+    } else {
+      DrawText("GAME PAUSED", wf * 5, hf * 5, 40, DARKGRAY);
+    }
     if (pick_shape == TSHAPE) {
       t1.new_orientation = orientation;
       t1.x = startPos_x + (float)move;
       t1.y = startPos_y + (float)grid_depth;
       printf("i");
       draw_t_shape(&t1);
-    } else if (pick_shape == LINESHAPE || pick_shape == LINESHAPE2 || pick_shape == LINESHAPE3) {
+    } else if (pick_shape == LINESHAPE || pick_shape == LINESHAPE2 ||
+               pick_shape == LINESHAPE3) {
       l1.new_orientation = orientation % 2;
       l1.x = startPos_x + (float)move;
       l1.y = startPos_y + (float)grid_depth;
@@ -461,11 +474,10 @@ int main(int argc, char *argv[]) {
     // printf("Draw t1 x, y %f, %f \n", t1.x, t1.y);
     // FIXME : if not for this , it is segfaulting !!! something to do with
     // threads and asyc ??
-
     DrawWall();
     if (goldenwall > 0) {
       if (golden_frame_counter < MyFPS) {
-        golden_frame_counter++;
+        if (!pause)golden_frame_counter++;
         DrawGoldenWall(golden_frame_counter + 10);
       } else {
         golden_frame_counter = 0;
