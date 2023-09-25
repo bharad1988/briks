@@ -3,7 +3,7 @@ just an exercise to use ray-lib in c
 
 ### Tetris like project
 The idea is to explore ray-lib and also have some fun writing code. Has a lot of bugs.
-![g-1](https://github.com/bharad1988/briks/assets/19284613/f4cf446a-63b6-46e2-8c65-9b9165865e56)
+![g-4](https://github.com/bharad1988/briks/assets/19284613/c264a06f-9bd8-4b1d-8699-ab800f9a7164| width=100 )
 
 ![g-2](https://github.com/bharad1988/briks/assets/19284613/4df357b9-b616-4a44-a5a4-207641ce28a8)
 
