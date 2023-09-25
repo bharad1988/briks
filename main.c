@@ -38,6 +38,11 @@
 #define BEIGE2                                                                 \
   CLITERAL(Color) { 230, 220, 210, 255 } // Beige
 
+#define LINESHAPE 1
+#define TSHAPE 0
+#define LINESHAPE2 2
+#define LINESHAPE3 3
+
 const int hf = 12; // height ratio
 const int wf = 10; // width ratio
 
@@ -45,6 +50,7 @@ bool wallMap[wallH + 1][wallW];
 bool wallLine[wallH];
 int goldenwall = 0;
 int score = 0;
+int object_picker = 0;
 // inital position of object
 // --- all these have to be reset  ON BRICK -----
 float startPos_x = wallW / 2.0;
@@ -53,10 +59,8 @@ size_t grid_depth = 0; // falling position
 int orientation = 0;   // object orientation
 int move = 0;          // lateral movement , relative from starting pos
 int offset_x = 0;
-bool make_object_brick = false;
+bool reset_object = true;
 // ------------------------------------
-
-bool reset_object = false;
 
 // function declarations
 void InitWall();
@@ -86,21 +90,16 @@ typedef struct TShape {
   bool invalid_orientation;
 } tshape_t;
 
-typedef struct LineShape3 {
-  int a; //-
-  int b; // -
-  int c; //  -
+typedef struct LineShape {
+  float x;
+  float y;
+  int line_size;
+  Vector2 a[4]; //-
   int orientation;
   int new_orientation;
   bool brick;
-} lineshape3_t;
-
-typedef struct LineShape2 {
-  int a; //-
-  int b; // -
-  int orientation;
-  bool brick;
-} lineshape2_t;
+  bool invalid_orientation;
+} lineshape_t;
 
 void setBrick(int x, int y) { wallMap[y][x] = true; }
 
@@ -151,6 +150,27 @@ bool check_t_brick(tshape_t t) {
     return true;
   }
   return false;
+}
+
+bool check_line_brick(lineshape_t t) {
+  for (int i = 0; i < t.line_size; i++) {
+    if (wallMap[(int)t.a[i].y + 1][(int)t.a[i].x] == true) {
+      // printf("BRICCKED1 ");
+      return true;
+    }
+  }
+  return false;
+}
+void render_all_line_box(lineshape_t *t1, int color) {
+  for (int i = 0; i < t1->line_size; i++) {
+    RenderMiniBox(t1->a[i].x, t1->a[i].y, color);
+  }
+}
+
+void set_line_brick(lineshape_t *t) {
+  for (int i = 0; i < t->line_size; i++) {
+    setBrick(t->a[i].x, t->a[i].y);
+  }
 }
 
 void set_t_brick(tshape_t *t) {
@@ -277,6 +297,7 @@ tshape_t design_tshape(tshape_t *t) {
     }
     t2.brick = check_t_brick(t2);
   }
+  t2.orientation = t2.new_orientation;
   return t2;
 }
 
@@ -304,8 +325,56 @@ void draw_t_shape(tshape_t *t1) {
   render_all_t_box(t1, MYBEIGE);
 }
 
+lineshape_t design_line_shape(lineshape_t *t) {
+  lineshape_t l2;
+  l2 = *t;
+  l2.line_size = t->line_size;
+  if (t->new_orientation == 0) {
+    // draw up
+    for (int i = 0; i < l2.line_size; i++) {
+      l2.a[i].x = t->x;
+      l2.a[i].y = t->y + i + 1;
+      if (is_brick_wall(l2.a[i])) {
+        l2.invalid_orientation = true;
+        return l2;
+      }
+    }
+    l2.brick = check_line_brick(l2);
+  } else if (t->new_orientation == 1) {
+    // draw down
+    for (int i = 0; i < l2.line_size; i++) {
+      l2.a[i].x = t->x + i;
+      l2.a[i].y = t->y;
+      if (is_brick_wall(l2.a[i])) {
+        l2.invalid_orientation = true;
+        return l2;
+      }
+    }
+    l2.brick = check_line_brick(l2);
+  }
+  l2.orientation = t->new_orientation;
+  return l2;
+}
+
+void draw_line_shape(lineshape_t *l) {
+  lineshape_t l1 = design_line_shape(l);
+  if (l1.invalid_orientation) {
+    l->new_orientation = l->orientation;
+    l1 = design_line_shape(l);
+  }
+  l = &l1;
+  // printf("brick status %d , t2 %d\n", t1->brick, t2.brick);
+  if (l1.brick == true) {
+    // printf("t2 setting bricks \n");
+    set_line_brick(l);
+    resetObject();
+    return;
+  }
+  render_all_line_box(l, MYBEIGE);
+}
+
 int main(int argc, char *argv[]) {
-  InitWindow(multiple * wf, multiple * (hf), "BRIKS");
+  InitWindow(multiple * (wf + 10) , multiple * (hf), "BRIKS");
   InitAudioDevice();
   Music music = LoadMusicStream("resources/t-2.mp3");
   // Music music = LoadMusicStream("resources/country.mp3");
@@ -327,7 +396,9 @@ int main(int argc, char *argv[]) {
   int golden_frame_counter = 0;
   // tshape_t *t1 = (tshape_t *)malloc(sizeof(tshape_t));
   tshape_t t1;
+  lineshape_t l1,l2,l3;
   t1.brick = false;
+  int pick_shape = LINESHAPE;
   printf("default brick status - %d ", t1.brick);
   // Main event loop for UI - check FPS for frequency
   while (!WindowShouldClose()) // Detect window close button or ESC key
@@ -338,8 +409,8 @@ int main(int argc, char *argv[]) {
     ClearBackground(RAYWHITE);
     DrawMyGrid();
     char buffer[50];
-    sprintf(buffer, "Score - %d", score);
-    DrawText(buffer, 10, 10, 20, DARKGRAY);
+    sprintf(buffer, "Score - %d", score-1);
+    DrawText(buffer, (wf * multiple) + 10, 10, 20, DARKGRAY);
     frame_counter++;
     if (frame_counter > fallspeed(MyFPS)) {
       frame_counter = 0;
@@ -356,13 +427,40 @@ int main(int argc, char *argv[]) {
     if (IsKeyPressed(KEY_DOWN)) {
       grid_depth++;
     }
-    t1.orientation = orientation;
-    t1.x = startPos_x + (float)move;
-    t1.y = startPos_y + (float)grid_depth;
+    // when reset pick a type of object
+    if (reset_object) {
+    srand(time(0));
+    object_picker = rand();
+    printf("rand number %d \n", object_picker);
+      if (object_picker % 4 == TSHAPE) {
+        pick_shape = TSHAPE;
+      } else if (object_picker % 4 == LINESHAPE) {
+        pick_shape = LINESHAPE;
+      } else if (object_picker % 4 == LINESHAPE2) {
+        pick_shape = LINESHAPE2;
+      } else if (object_picker % 4 == LINESHAPE3) {
+        pick_shape = LINESHAPE3;
+      }
+      reset_object = false;
+    }
+
+    if (pick_shape == TSHAPE) {
+      t1.new_orientation = orientation;
+      t1.x = startPos_x + (float)move;
+      t1.y = startPos_y + (float)grid_depth;
+      printf("i");
+      draw_t_shape(&t1);
+    } else if (pick_shape == LINESHAPE || pick_shape == LINESHAPE2 || pick_shape == LINESHAPE3) {
+      l1.new_orientation = orientation % 2;
+      l1.x = startPos_x + (float)move;
+      l1.y = startPos_y + (float)grid_depth;
+      l1.line_size = pick_shape + 1;
+      printf(" j ");
+      draw_line_shape(&l1);
+    }
     // printf("Draw t1 x, y %f, %f \n", t1.x, t1.y);
-    // FIXME : if not for this , it is segfaulting !!! something to do with threads and asyc ??
-    printf("i "); 
-    draw_t_shape(&t1);
+    // FIXME : if not for this , it is segfaulting !!! something to do with
+    // threads and asyc ??
 
     DrawWall();
     if (goldenwall > 0) {
@@ -374,14 +472,6 @@ int main(int argc, char *argv[]) {
         ResetWallLine();
       }
     }
-    /*     for (int i = 0; i <= wallH; i++) {
-          for (int j = 0; j < wallW; j++) {
-            printf("%d ", wallMap[i][j]);
-          }
-          printf("\n");
-        }
-     */
-    // DrawFPS(10, 10);
     EndDrawing();
   }
 
@@ -410,7 +500,7 @@ void resetObject() {
   orientation = 0; // object orientation
   move = 0;        // lateral movement , relative from starting pos
   offset_x = 0;
-  make_object_brick = false;
+  reset_object = true;
 }
 
 void DrawWall() {
@@ -465,14 +555,6 @@ void ResetWallLine() {
   }
   goldenwall--;
   // printf("goldenwall - %d \n", goldenwall);
-}
-
-bool checkWall(int x, int y) {
-  if (wallMap[y + 1][x] == true) {
-    make_object_brick = true;
-    return true;
-  }
-  return false;
 }
 
 void DrawMyGrid() {
