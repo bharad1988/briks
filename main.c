@@ -50,7 +50,6 @@ bool wallMap[wallH + 1][wallW];
 bool wallLine[wallH];
 int goldenwall = 0;
 int score = 0;
-int object_picker = 0;
 // inital position of object
 // --- all these have to be reset  ON BRICK -----
 float startPos_x = wallW / 2.0;
@@ -395,11 +394,12 @@ int main(int argc, char *argv[]) {
   InitWall();
   int golden_frame_counter = 0;
   // tshape_t *t1 = (tshape_t *)malloc(sizeof(tshape_t));
-  tshape_t t1;
-  lineshape_t l1, l2, l3;
+  tshape_t t1, tn;
+  lineshape_t l1, ln;
   t1.brick = false;
-  int pick_shape = LINESHAPE;
-  printf("default brick status - %d ", t1.brick);
+  int pick_shape;
+  int next_object = LINESHAPE;
+  // printf("default brick status - %d ", t1.brick);
   // Main event loop for UI - check FPS for frequency
   while (!WindowShouldClose()) // Detect window close button or ESC key
   {
@@ -410,8 +410,8 @@ int main(int argc, char *argv[]) {
     DrawMyGrid();
     char buffer[50];
     sprintf(buffer, "Score - %d", score - 1);
-    DrawText(buffer, (wf * multiple) + 10, 10, 20, DARKGRAY);
-
+    DrawText(buffer, (wf * multiple) + 10, 10, 40, DARKPURPLE);
+    // printf("starting loop ");
     // Pause/Resume music playing with key p
     if (IsKeyPressed(KEY_P)) {
       pause = !pause;
@@ -440,27 +440,19 @@ int main(int argc, char *argv[]) {
       // when reset pick a type of object
       if (reset_object) {
         srand(time(0));
-        object_picker = rand();
-        printf("rand number %d \n", object_picker);
-        if (object_picker % 4 == TSHAPE) {
-          pick_shape = TSHAPE;
-        } else if (object_picker % 4 == LINESHAPE) {
-          pick_shape = LINESHAPE;
-        } else if (object_picker % 4 == LINESHAPE2) {
-          pick_shape = LINESHAPE2;
-        } else if (object_picker % 4 == LINESHAPE3) {
-          pick_shape = LINESHAPE3;
-        }
+        pick_shape = next_object;
+        next_object = rand();
+        next_object = next_object % 4;
         reset_object = false;
       }
     } else {
       DrawText("GAME PAUSED", wf * 5, hf * 5, 40, DARKGRAY);
     }
+    // draw current object
     if (pick_shape == TSHAPE) {
       t1.new_orientation = orientation;
       t1.x = startPos_x + (float)move;
       t1.y = startPos_y + (float)grid_depth;
-      printf("i");
       draw_t_shape(&t1);
     } else if (pick_shape == LINESHAPE || pick_shape == LINESHAPE2 ||
                pick_shape == LINESHAPE3) {
@@ -468,8 +460,22 @@ int main(int argc, char *argv[]) {
       l1.x = startPos_x + (float)move;
       l1.y = startPos_y + (float)grid_depth;
       l1.line_size = pick_shape + 1;
-      printf(" j ");
       draw_line_shape(&l1);
+    }
+    // draw next object
+    DrawText("Next object", (wf * multiple) + 10, hf * multiple /2  - 50, 40, DARKGRAY);
+    if (next_object == TSHAPE) {
+      tn.new_orientation = 1;
+      tn.x = wf*2 + 5;
+      tn.y = hf;
+      draw_t_shape(&tn);
+    } else if (next_object == LINESHAPE || next_object == LINESHAPE2 ||
+               next_object == LINESHAPE3) {
+      ln.new_orientation = 0;
+      ln.x = wf*2 + 5;
+      ln.y = hf;
+      ln.line_size = next_object + 1;
+      draw_line_shape(&ln);
     }
     // printf("Draw t1 x, y %f, %f \n", t1.x, t1.y);
     // FIXME : if not for this , it is segfaulting !!! something to do with
@@ -477,7 +483,8 @@ int main(int argc, char *argv[]) {
     DrawWall();
     if (goldenwall > 0) {
       if (golden_frame_counter < MyFPS) {
-        if (!pause)golden_frame_counter++;
+        if (!pause)
+          golden_frame_counter++;
         DrawGoldenWall(golden_frame_counter + 10);
       } else {
         golden_frame_counter = 0;
