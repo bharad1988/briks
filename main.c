@@ -524,20 +524,6 @@ void DrawMyGrid() {
     DrawLine(0, y, multiple * wf, y, BEIGE2);
 }
 
-/* void DrawMiniBox(int x, int y) {
-  size_t depth = 3;
-  size_t xp = x * box;
-  size_t yp = y * box;
-  Rectangle rec = {xp, yp, box, box};
-  DrawRectangleRec(rec, gencolor(220));
-  Rectangle rec2 = {xp + depth, yp + depth, box - depth * 2, box - depth * 2};
-  DrawRectangleRec(rec2, gencolor(200));
-  if (checkWall(x, y) || make_object_brick) {
-    setBrick(x, y);
-    reset_object = true;
-  }
-}
- */
 void DrawWallMiniBox(int x, int y, int color) {
   size_t depth = 3;
   size_t xp = x * box;
