@@ -185,114 +185,54 @@ bool is_brick_wall(Vector2 v1) {
   return false;
 }
 
-tshape_t design_tshape(tshape_t *t) {
-  tshape_t t2;
+tshape_t design_tshape(tshape_t *t, bool skip_check) {
+  tshape_t t2 = {};
   if (t->new_orientation == 0) {
     // draw up
     t2.a.x = t->x - 1;
     t2.a.y = t->y + 1;
-    if (is_brick_wall(t2.a)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.b.x = t->x;
     t2.b.y = t->y + 1;
-    if (is_brick_wall(t2.b)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.c.x = t->x + 1;
     t2.c.y = t->y + 1;
-    if (is_brick_wall(t2.c)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.d.x = t->x;
     t2.d.y = t->y;
-    if (is_brick_wall(t2.d)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
-    t2.brick = check_t_brick(t2);
   } else if (t->new_orientation == 1) {
     // draw right
     t2.a.x = t->x;
     t2.a.y = t->y;
-    if (is_brick_wall(t2.a)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.b.x = t->x;
     t2.b.y = t->y + 1;
-    if (is_brick_wall(t2.b)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.c.x = t->x;
     t2.c.y = t->y + 2;
-    if (is_brick_wall(t2.c)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.d.x = t->x + 1;
     t2.d.y = t->y + 1;
-    if (is_brick_wall(t2.d)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
-    t2.brick = check_t_brick(t2);
   } else if (t->new_orientation == 2) {
     // draw down
     t2.a.x = t->x - 1;
     t2.a.y = t->y;
-    if (is_brick_wall(t2.a)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.b.x = t->x;
     t2.b.y = t->y;
-    if (is_brick_wall(t2.b)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.c.x = t->x + 1;
     t2.c.y = t->y;
-    if (is_brick_wall(t2.c)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.d.x = t->x;
     t2.d.y = t->y + 1;
-    if (is_brick_wall(t2.d)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
-    t2.brick = check_t_brick(t2);
   } else if (t->new_orientation == 3) {
     // draw left
     t2.a.x = t->x;
     t2.a.y = t->y;
-    if (is_brick_wall(t2.a)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.b.x = t->x;
     t2.b.y = t->y + 1;
-    if (is_brick_wall(t2.b)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.c.x = t->x;
     t2.c.y = t->y + 2;
-    if (is_brick_wall(t2.c)) {
-      t2.invalid_orientation = true;
-      return t2;
-    }
     t2.d.x = t->x - 1;
     t2.d.y = t->y + 1;
-    if (is_brick_wall(t2.d)) {
+    t2.brick = check_t_brick(t2);
+  }
+  if (!skip_check) {
+    if (is_brick_wall(t2.a) || is_brick_wall(t2.b) || is_brick_wall(t2.c) ||
+        is_brick_wall(t2.d)) {
       t2.invalid_orientation = true;
-      return t2;
     }
     t2.brick = check_t_brick(t2);
   }
@@ -307,11 +247,11 @@ void render_all_t_box(tshape_t *t1, int color) {
   RenderMiniBox(t1->d.x, t1->d.y, color);
 }
 
-void draw_t_shape(tshape_t *t1) {
-  tshape_t t2 = design_tshape(t1);
+void draw_t_shape(tshape_t *t1, bool skip_check) {
+  tshape_t t2 = design_tshape(t1, skip_check);
   if (t2.invalid_orientation) {
     t1->new_orientation = t1->orientation;
-    t2 = design_tshape(t1);
+    t2 = design_tshape(t1, skip_check);
   }
   t1 = &t2;
   // printf("brick status %d , t2 %d\n", t1->brick, t2.brick);
@@ -453,7 +393,7 @@ int main(int argc, char *argv[]) {
       t1.new_orientation = orientation;
       t1.x = startPos_x + (float)move;
       t1.y = startPos_y + (float)grid_depth;
-      draw_t_shape(&t1);
+      draw_t_shape(&t1, false);
     } else if (pick_shape == LINESHAPE || pick_shape == LINESHAPE2 ||
                pick_shape == LINESHAPE3) {
       l1.new_orientation = orientation % 2;
@@ -463,16 +403,17 @@ int main(int argc, char *argv[]) {
       draw_line_shape(&l1);
     }
     // draw next object
-    DrawText("Next object", (wf * multiple) + 10, hf * multiple /2  - 50, 40, DARKGRAY);
+    DrawText("Next object", (wf * multiple) + 10, hf * multiple / 2 - 50, 40,
+             DARKGRAY);
     if (next_object == TSHAPE) {
-      tn.new_orientation = 1;
-      tn.x = wf*2 + 5;
-      tn.y = hf;
-      draw_t_shape(&tn);
+      tn.new_orientation = 0;
+      tn.x = wf * 2 + 5;
+      tn.y = hf + 2;
+      draw_t_shape(&tn, true);
     } else if (next_object == LINESHAPE || next_object == LINESHAPE2 ||
                next_object == LINESHAPE3) {
       ln.new_orientation = 0;
-      ln.x = wf*2 + 5;
+      ln.x = wf * 2 + 5;
       ln.y = hf;
       ln.line_size = next_object + 1;
       draw_line_shape(&ln);
