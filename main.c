@@ -68,13 +68,6 @@ void DrawWall();
 void DrawGoldenWall(int color);
 void ResetWallLine();
 void resetObject();
-void DrawMiniBox(int x, int y);
-void DrawWallMiniBox(int x, int y, int color);
-void DrawObject(int x, int y, int direction);
-void TBoxU(int startX, int StartY);
-void TBoxD(int startX, int StartY);
-void TBoxR(int startX, int StartY);
-void TBoxL(int startX, int StartY);
 
 typedef struct TShape {
   float x;
@@ -259,6 +252,7 @@ void draw_t_shape(tshape_t *t1, bool skip_check) {
     // printf("t2 setting bricks \n");
     set_t_brick(t1);
     resetObject();
+    t1 = (tshape_t *){0};
     return;
   }
   render_all_t_box(t1, MYBEIGE);
@@ -307,6 +301,7 @@ void draw_line_shape(lineshape_t *l) {
     // printf("t2 setting bricks \n");
     set_line_brick(l);
     resetObject();
+    l = (lineshape_t *){0};
     return;
   }
   render_all_line_box(l, MYBEIGE);
@@ -385,10 +380,7 @@ int main(int argc, char *argv[]) {
         next_object = next_object % 4;
         reset_object = false;
       }
-    } else {
-      DrawText("GAME PAUSED", wf * 5, hf * 5, 40, DARKGRAY);
-    }
-    // draw current object
+    }     // draw current object
     if (pick_shape == TSHAPE) {
       t1.new_orientation = orientation;
       t1.x = startPos_x + (float)move;
@@ -432,6 +424,10 @@ int main(int argc, char *argv[]) {
         ResetWallLine();
       }
     }
+    if (pause) {
+      DrawText("GAME PAUSED", wf * 5, hf * 5, 40, DARKGRAY);
+    }
+
     EndDrawing();
   }
 
@@ -522,23 +518,4 @@ void DrawMyGrid() {
     DrawLine(x, 0, x, multiple * hf, BEIGE2);
   for (int y = box; y < multiple * hf; y += box)
     DrawLine(0, y, multiple * wf, y, BEIGE2);
-}
-
-void DrawWallMiniBox(int x, int y, int color) {
-  size_t depth = 3;
-  size_t xp = x * box;
-  size_t yp = y * box;
-  Rectangle rec = {xp, yp, box, box};
-  Color color1, color2;
-  if (color == MYGRAY) {
-    color1 = gencolorgrey(200);
-    color2 = gencolorgrey(180);
-  }
-  if (color == MYGOLD) {
-    color1 = gencolorgold(245);
-    color2 = gencolorgold(255);
-  }
-  DrawRectangleRec(rec, color1);
-  Rectangle rec2 = {xp + depth, yp + depth, box - depth * 2, box - depth * 2};
-  DrawRectangleRec(rec2, color2);
 }
